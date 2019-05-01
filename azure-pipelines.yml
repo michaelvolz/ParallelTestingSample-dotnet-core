@@ -1,30 +1,38 @@
-jobs:
-- job: 'ParallelTesting'
-  pool:
-    name: Hosted Ubuntu 1604
-  strategy:
-    parallel: 5
-  displayName: Run tests in parallel
+# ASP.NET Core
+# Build and test ASP.NET Core projects targeting .NET Core.
+# Add steps that run tests, create a NuGet package, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
 
-  steps:
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '**/*.csproj'
+pool:
+  vmImage: 'vs2017-win2016'
 
-  - bash: |
-      tests=($(dotnet test . --no-build --list-tests | grep Test_))
-      . 'create_slicing_filter_condition.sh' $tests
-    displayName: 'Create slicing filter condition'
-  
-  - bash: |
-      echo "Slicing filter condition: $(targetTestsFilter)"
-    displayName: 'Echo slicing filter condition'
+variables:
+  buildConfiguration: 'Release'
 
-  - task: DotNetCoreCLI@2
-    displayName: Test
-    inputs:
-      command: test
-      projects: '**/*Tests/*Tests.csproj'
-      arguments: '--no-build --filter "$(targetTestsFilter)"'
+steps:
+- task: DotNetCoreInstaller@0
+  inputs:
+    version: '3.0.100-preview-010184'
+
+- script: dotnet build --configuration $(buildConfiguration)
+  displayName: 'dotnet build $(buildConfiguration)'
+
+- task: WhiteSource Bolt@19
+  inputs:
+    advance: true
+
+- powershell: .\test.ps1 -Verbose
+  displayName: 'Tests'
+
+- task: PublishTestResults@2
+  inputs:
+    testResultsFormat: 'VSTest' # Options: JUnit, NUnit, VSTest, xUnit
+    testResultsFiles: '**/TEST-*.xml'
+    #searchFolder: '$(System.DefaultWorkingDirectory)' # Optional
+    #mergeTestResults: true # Optional
+    #testRunTitle: # Optional
+    #buildPlatform: # Optional
+    #buildConfiguration: # Optional
+    publishRunAttachments: false # Optional
+
+#- task: PublishBuildArtifacts@1
